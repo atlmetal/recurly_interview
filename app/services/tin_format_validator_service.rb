@@ -9,14 +9,14 @@ class TinFormatValidatorService < ApplicationService
   }.freeze
 
   GROUPINGS = {
-    au_abn: /(..)(...)(...)(...)/,
-    au_acn: /(...)(...)(...)/
+    au_abn: /(\d{2})(\d{3})(\d{3})(\d{3})/,
+    au_acn: /(\d{3})(\d{3})(\d{3})/
   }.freeze
 
   def initialize(country, raw)
     @country = country
     @raw = raw
-    @digits_only_tin = raw.gsub(/\D/, '')
+    @processed_tin = raw.to_s.gsub(/\s+/, '').upcase
   end
 
   def call
@@ -37,16 +37,21 @@ class TinFormatValidatorService < ApplicationService
 
   def find_and_process_matching_format
     country_formats.each do |type, rx|
-      if rx.match?(@digits_only_tin)
-        return success_result(type, @digits_only_tin)
+      if rx.match?(@processed_tin)
+        return success_result(type, @processed_tin)
       end
+    end
+
+    if @country == :CA && /^\d{9}$/.match?(@processed_tin)
+      full_tin = @processed_tin + 'RT0001'
+      return success_result(:ca_gst, full_tin)
     end
 
     nil
   end
 
-  def success_result(type, digits_only_tin)
-    { valid: true, tin_type: type, formatted_tin: format_tin(type, digits_only_tin), errors: [] }
+  def success_result(type, valid_tin)
+    { valid: true, tin_type: type, formatted_tin: format_tin(type, valid_tin), errors: [] }
   end
 
   def unsupported_country_error
@@ -57,14 +62,14 @@ class TinFormatValidatorService < ApplicationService
     { valid: false, tin_type: nil, formatted_tin: nil, errors: ['Invalid format or length for specified country'] }
   end
 
-  def format_tin(type, digits_only_tin)
+  def format_tin(type, valid_tin)
     case type
     when :au_abn
-      digits_only_tin.gsub(GROUPINGS[type], '\1 \2 \3 \4')
+      valid_tin.gsub(GROUPINGS[type], '\1 \2 \3 \4')
     when :au_acn
-      digits_only_tin.gsub(GROUPINGS[type], '\1 \2 \3')
+      valid_tin.gsub(GROUPINGS[type], '\1 \2 \3')
     else
-      digits_only_tin
+      valid_tin
     end
   end
 end
