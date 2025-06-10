@@ -28,4 +28,8 @@
 #       enabled: "ON"
 
 en:
-  hello: "Hello world"
+  tin_validator:
+    errors:
+      unsupported_country: 'Unsupported country'
+      invalid_format_or_length_for_specified_country: 'Invalid format or length for specified country %{country}'
+
