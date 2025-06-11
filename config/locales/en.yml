@@ -30,6 +30,6 @@
 en:
   tin_validator:
     errors:
-      unsupported_country: 'Unsupported country'
-      invalid_format_or_length_for_specified_country: 'Invalid format or length for specified country %{country}'
-
+      unsupported_country: "Unsupported country"
+      invalid_format_or_length_for_specified_country: "Invalid format or length for specified country %{country}"
+      checksum_failed: "Failed ABN checksum"

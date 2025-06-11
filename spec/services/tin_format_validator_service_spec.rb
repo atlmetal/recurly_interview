@@ -11,9 +11,9 @@ RSpec.describe TinFormatValidatorService, type: :service do
       it 'returns unsupported country error' do
         expect(result[:valid]).to be false
         expect(result[:errors]).to include(
-          I18n.t('.tin_validator.errors.unsupported_country', country: country)
+          I18n.t(Constants::Formats::I18N_ERROR_KEYS[:unsupported_country], country: country)
         )
-        expect(result).not_to have_key(:tin_type)
+        expect(result[:tin_type]).to be_nil
         expect(result[:formatted_tin]).to be_nil
       end
     end
@@ -25,7 +25,7 @@ RSpec.describe TinFormatValidatorService, type: :service do
       it 'returns invalid format error' do
         expect(result[:valid]).to be false
         expect(result[:errors]).to include(
-          I18n.t('.tin_validator.errors.invalid_format_or_length_for_specified_country')
+          I18n.t(Constants::Formats::I18N_ERROR_KEYS[:invalid_format], country: country)
         )
         expect(result[:tin_type]).to be_nil
         expect(result[:formatted_tin]).to be_nil
@@ -37,6 +37,8 @@ RSpec.describe TinFormatValidatorService, type: :service do
 
       context 'with a valid ABN' do
         let(:raw) { '10120000004' }
+
+        before { allow(AbnChecksumService).to receive(:valid?).with(raw).and_return(true) }
 
         it 'validates and formats an ABN' do
           expect(result[:valid]).to be true
@@ -54,6 +56,32 @@ RSpec.describe TinFormatValidatorService, type: :service do
           expect(result[:tin_type]).to eq(:au_acn)
           expect(result[:formatted_tin]).to eq('123 456 789')
           expect(result[:errors]).to be_empty
+        end
+      end
+
+      context 'when ABN is correct format and checksum is correct too' do
+        let(:raw) { '10120000004' }
+
+        before { allow(AbnChecksumService).to receive(:valid?).with(raw).and_return(true) }
+
+        it 'returns success with formatted ABN' do
+          expect(result[:valid]).to be true
+          expect(result[:tin_type]).to eq(:au_abn)
+          expect(result[:formatted_tin]).to eq('10 120 000 004')
+          expect(result[:errors]).to be_empty
+        end
+      end
+
+      context 'when ABN is correct format but fails checksum' do
+        let(:raw) { '10120000005' }
+
+        before { allow(AbnChecksumService).to receive(:valid?).with(raw).and_return(false) }
+
+        it 'returns checksum failure' do
+          expect(result[:valid]).to be false
+          expect(result[:errors]).to include(I18n.t(Constants::Formats::I18N_ERROR_KEYS[:checksum_failed]))
+          expect(result[:tin_type]).to eq(:au_abn)
+          expect(result[:formatted_tin]).to eq('10 120 000 005')
         end
       end
     end
@@ -104,7 +132,7 @@ RSpec.describe TinFormatValidatorService, type: :service do
         it 'rejects it' do
           expect(result[:valid]).to be false
           expect(result[:errors]).to include(
-            I18n.t('.tin_validator.errors.invalid_format_or_length_for_specified_country')
+            I18n.t(Constants::Formats::I18N_ERROR_KEYS[:invalid_format], country: country)
           )
           expect(result[:tin_type]).to be_nil
           expect(result[:formatted_tin]).to be_nil

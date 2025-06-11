@@ -1,71 +1,68 @@
 class TinFormatValidatorService < ApplicationService
+  PATTERNS = Constants::Formats::PATTERNS
+  GROUPINGS = Constants::Formats::GROUPINGS
+  I18N_ERROR_KEYS = Constants::Formats::I18N_ERROR_KEYS
+
   def initialize(country, raw)
     @country = country
-    @raw = raw
-    @processed_tin = raw.to_s.gsub(/\s+/, '').upcase
+    @normalized_tin = raw.to_s.gsub(/\s+/, '').upcase
   end
 
   def call
-    return unsupported_country_error unless country_supported?
+    return error_response(:unsupported_country) unless supported_country?
+    return process_canadian_tin if @country == :CA && canadian_short_tin?
 
-    process_tin_for_canada || process_tin_other_countries || invalid_format_error
+    PATTERNS[@country].each do |type, regex|
+      next unless regex.match?(@normalized_tin)
+      return type == :au_abn ? process_au_abn : success_response(type)
+    end
+
+    error_response(:invalid_format)
   end
 
   private
 
-  def formats
-    @formats ||= Constants::Formats::FORMATS
+  def supported_country?
+    PATTERNS.key?(@country)
   end
 
-  def country_supported?
-    formats.key?(@country)
+  def canadian_short_tin?
+    /\A\d{9}\z/ =~ @normalized_tin
   end
 
-  def country_formats
-    formats[@country]
+  def process_canadian_tin
+    full_tin = "#{@normalized_tin}RT0001"
+    success_response(:ca_gst, full_tin)
   end
 
-  def process_tin_for_canada
-    return unless @country == :CA && /^\d{9}$/.match?(@processed_tin)
-
-    full_tin = "#{@processed_tin}RT0001"
-    success_result(:ca_gst, full_tin)
+  def process_au_abn
+    return success_response(:au_abn) if AbnChecksumService.valid?(@normalized_tin)
+    error_response(:checksum_failed, tin_type: :au_abn, formatted_tin: formatted_tin(:au_abn))
   end
 
-  def process_tin_other_countries
-    country_formats.each do |type, rx|
-      return success_result(type, @processed_tin) if rx.match?(@processed_tin)
-    end
-
-    nil
+  def success_response(type, tin = @normalized_tin)
+    {
+      valid: true,
+      tin_type: type,
+      formatted_tin: formatted_tin(type, tin),
+      errors: []
+    }
   end
 
-  def success_result(type, valid_tin)
-    { valid: true, tin_type: type, formatted_tin: format_tin(type, valid_tin), errors: [] }
+  def error_response(key, tin_type: nil, formatted_tin: nil)
+    {
+      valid: false,
+      tin_type: tin_type,
+      formatted_tin: formatted_tin,
+      errors: [I18n.t(I18N_ERROR_KEYS.fetch(key), country: @country)]
+    }
   end
 
-  def unsupported_country_error
-    { valid: false, errors: [I18n.t('.tin_validator.errors.unsupported_country', country: @country)] }
-  end
-
-  def invalid_format_error
-    { valid: false, tin_type: nil, formatted_tin: nil, errors: [
-      I18n.t('.tin_validator.errors.invalid_format_or_length_for_specified_country')
-    ] }
-  end
-
-  def groupings
-    @groupings ||= Constants::Formats::GROUPINGS
-  end
-
-  def format_tin(type, valid_tin)
+  def formatted_tin(type, tin = @normalized_tin)
     case type
-    when :au_abn
-      valid_tin.gsub(groupings[type], '\1 \2 \3 \4')
-    when :au_acn
-      valid_tin.gsub(groupings[type], '\1 \2 \3')
-    else
-      valid_tin
+    when :au_abn then  tin.gsub(GROUPINGS[type], '\\1 \\2 \\3 \\4')
+    when :au_acn then  tin.gsub(GROUPINGS[type], '\\1 \\2 \\3')
+    else tin
     end
   end
 end
