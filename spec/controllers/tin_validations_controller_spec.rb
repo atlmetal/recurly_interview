@@ -1,9 +1,9 @@
 require 'rails_helper'
 
 RSpec.describe Api::V1::TinValidationsController, type: :controller do
-  describe 'POST #validate' do
-    let(:valid_params) { { country: :AU, tin: '10120000004' } }
-    let(:invalid_params) { { country: :US, tin: 'dummy_sample' } }
+  describe 'GET #validate' do
+    let(:valid_params) { { country: :AU, number: '10120000004' } }
+    let(:invalid_params) { { country: :US, number: 'dummy_sample' } }
     let(:service_instance_double) { instance_double(TinFormatValidatorService) }
 
     before do
@@ -21,12 +21,12 @@ RSpec.describe Api::V1::TinValidationsController, type: :controller do
       end
 
       it 'returns http success' do
-        post :validate, params: valid_params, as: :json
+        get :validate, params: valid_params, as: :json
         expect(response).to have_http_status(:ok)
       end
 
       it 'returns validation result in JSON' do
-        post :validate, params: valid_params, as: :json
+        get :validate, params: valid_params, as: :json
         expect(response.content_type).to eq('application/json; charset=utf-8')
         expect(JSON.parse(response.body)).to eq({
           'valid' => true,
@@ -50,12 +50,12 @@ RSpec.describe Api::V1::TinValidationsController, type: :controller do
       end
 
       it 'returns http unprocessable_entity' do
-        post :validate, params: invalid_params, as: :json
+        get :validate, params: invalid_params, as: :json
         expect(response).to have_http_status(:unprocessable_entity)
       end
 
       it 'returns errors in JSON' do
-        post :validate, params: invalid_params, as: :json
+        get :validate, params: invalid_params, as: :json
         expect(JSON.parse(response.body)).to eq({
           'valid' => false,
           'tin_type' => nil,

@@ -2,7 +2,7 @@ class Api::V1::TinValidationsController < ApplicationController
   wrap_parameters false
 
   def validate
-    result = TinFormatValidatorService.call(tin_validation_params[:country].to_sym, tin_validation_params[:tin])
+    result = TinFormatValidatorService.call(tin_validation_params[:country].to_sym, tin_validation_params[:number])
 
     if result[:valid]
       render json: result, status: :ok
@@ -14,6 +14,8 @@ class Api::V1::TinValidationsController < ApplicationController
   private
 
   def tin_validation_params
-    params.permit(:country, :tin)
+    params.require(:country)
+    params.require(:number)
+    params.permit(:country, :number)
   end
 end

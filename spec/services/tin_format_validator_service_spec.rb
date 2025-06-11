@@ -38,12 +38,25 @@ RSpec.describe TinFormatValidatorService, type: :service do
       context 'with a valid ABN' do
         let(:raw) { '10120000004' }
 
-        before { allow(AbnChecksumService).to receive(:valid?).with(raw).and_return(true) }
+        before do
+          allow(AbnChecksumService).to receive(:valid?).with(raw).and_return(true)
+          allow(AbnQueryClientService).to receive(:call).with(raw).and_return({
+            success: true,
+            data: {
+              name: 'Example Company Pty',
+              address: 'NSW 2001'
+            }
+          })
+        end
 
         it 'validates and formats an ABN' do
           expect(result[:valid]).to be true
           expect(result[:tin_type]).to eq(:au_abn)
           expect(result[:formatted_tin]).to eq('10 120 000 004')
+          expect(result[:business_registration]).to eq({
+            name: 'Example Company Pty',
+            address: 'NSW 2001'
+          })
           expect(result[:errors]).to be_empty
         end
       end
@@ -62,12 +75,25 @@ RSpec.describe TinFormatValidatorService, type: :service do
       context 'when ABN is correct format and checksum is correct too' do
         let(:raw) { '10120000004' }
 
-        before { allow(AbnChecksumService).to receive(:valid?).with(raw).and_return(true) }
+        before do
+          allow(AbnChecksumService).to receive(:valid?).with(raw).and_return(true)
+          allow(AbnQueryClientService).to receive(:call).with(raw).and_return({
+            success: true,
+            data: {
+              name: 'Example Company Pty',
+              address: 'NSW 2001'
+            }
+          })
+        end
 
         it 'returns success with formatted ABN' do
           expect(result[:valid]).to be true
           expect(result[:tin_type]).to eq(:au_abn)
           expect(result[:formatted_tin]).to eq('10 120 000 004')
+          expect(result[:business_registration]).to eq({
+            name: 'Example Company Pty',
+            address: 'NSW 2001'
+          })
           expect(result[:errors]).to be_empty
         end
       end
@@ -82,6 +108,63 @@ RSpec.describe TinFormatValidatorService, type: :service do
           expect(result[:errors]).to include(I18n.t(Constants::Formats::I18N_ERROR_KEYS[:checksum_failed]))
           expect(result[:tin_type]).to eq(:au_abn)
           expect(result[:formatted_tin]).to eq('10 120 000 005')
+        end
+      end
+
+      context 'when ABN is valid but not GST registered' do
+        let(:raw) { '10000000000' }
+
+        before do
+          allow(AbnChecksumService).to receive(:valid?).with(raw).and_return(true)
+          allow(AbnQueryClientService).to receive(:call).with(raw).and_return({
+            success: false,
+            error_key: :not_gst_registered
+          })
+        end
+
+        it 'returns not GST registered error' do
+          expect(result[:valid]).to be false
+          expect(result[:errors]).to include(I18n.t(Constants::Formats::I18N_ERROR_KEYS[:not_gst_registered]))
+          expect(result[:tin_type]).to eq(:au_abn)
+          expect(result[:formatted_tin]).to eq('10 000 000 000')
+        end
+      end
+
+      context 'when ABN API returns 404' do
+        let(:raw) { '51824753556' }
+
+        before do
+          allow(AbnChecksumService).to receive(:valid?).with(raw).and_return(true)
+          allow(AbnQueryClientService).to receive(:call).with(raw).and_return({
+            success: false,
+            error_key: :api_not_found
+          })
+        end
+
+        it 'returns API not found error' do
+          expect(result[:valid]).to be false
+          expect(result[:errors]).to include(I18n.t(Constants::Formats::I18N_ERROR_KEYS[:api_not_found]))
+          expect(result[:tin_type]).to eq(:au_abn)
+          expect(result[:formatted_tin]).to eq('51 824 753 556')
+        end
+      end
+
+      context 'when ABN API returns 500 or connection error' do
+        let(:raw) { '53004085616' }
+
+        before do
+          allow(AbnChecksumService).to receive(:valid?).with(raw).and_return(true)
+          allow(AbnQueryClientService).to receive(:call).with(raw).and_return({
+            success: false,
+            error_key: :api_error
+          })
+        end
+
+        it 'returns API error' do
+          expect(result[:valid]).to be false
+          expect(result[:errors]).to include(I18n.t(Constants::Formats::I18N_ERROR_KEYS[:api_error]))
+          expect(result[:tin_type]).to eq(:au_abn)
+          expect(result[:formatted_tin]).to eq('53 004 085 616')
         end
       end
     end

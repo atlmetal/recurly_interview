@@ -30,6 +30,9 @@
 en:
   tin_validator:
     errors:
-      unsupported_country: "Unsupported country"
+      unsupported_country: 'Unsupported country'
       invalid_format_or_length_for_specified_country: "Invalid format or length for specified country %{country}"
-      checksum_failed: "Failed ABN checksum"
+      checksum_failed: 'Failed ABN checksum'
+      not_gst_registered: 'Business is not GST registered'
+      api_not_found: 'Business is not registered'
+      api_error: 'Registration API could not be reached'

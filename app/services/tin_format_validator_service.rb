@@ -36,17 +36,27 @@ class TinFormatValidatorService < ApplicationService
   end
 
   def process_au_abn
-    return success_response(:au_abn) if AbnChecksumService.valid?(@normalized_tin)
-    error_response(:checksum_failed, tin_type: :au_abn, formatted_tin: formatted_tin(:au_abn))
+    unless AbnChecksumService.valid?(@normalized_tin)
+      return error_response(:checksum_failed, tin_type: :au_abn, formatted_tin: formatted_tin(:au_abn))
+    end
+
+    api_result = AbnQueryClientService.call(@normalized_tin)
+
+    if api_result[:success]
+      success_response(:au_abn, business_registration: api_result[:data])
+    else
+      error_response(api_result[:error_key], tin_type: :au_abn, formatted_tin: formatted_tin(:au_abn))
+    end
   end
 
-  def success_response(type, tin = @normalized_tin)
+  def success_response(type, tin = @normalized_tin, business_registration: nil)
     {
       valid: true,
       tin_type: type,
       formatted_tin: formatted_tin(type, tin),
+      business_registration: business_registration,
       errors: []
-    }
+    }.compact
   end
 
   def error_response(key, tin_type: nil, formatted_tin: nil)
